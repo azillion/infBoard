@@ -1,10 +1,11 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect } from 'react';
+import { useMachine } from '@xstate/react';
+import wbMachine from '../state/wbMachine';
 
 const Whiteboard: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [offset, setOffset] = useState({ x: 0, y: 0 });
-    const [isPanning, setIsPanning] = useState(false);
-    const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+    const [state, send] = useMachine(wbMachine);
+    const { offset } = state.context;
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -26,6 +27,8 @@ const Whiteboard: React.FC = () => {
         const drawScene = () => {
             gl.clearColor(1, 1, 1, 1);
             gl.clear(gl.COLOR_BUFFER_BIT);
+
+            // Additional rendering code for whiteboard content can go here
         };
 
         resizeCanvas();
@@ -37,18 +40,21 @@ const Whiteboard: React.FC = () => {
     }, [offset]);
 
     const handleMouseDown = (event: React.MouseEvent) => {
-        setIsPanning(true);
-        setStartPos({ x: event.clientX - offset.x, y: event.clientY - offset.y });
+        send({ type: 'MOUSE_DOWN', clientX: event.clientX, clientY: event.clientY });
     };
 
     const handleMouseMove = (event: React.MouseEvent) => {
-        if (isPanning) {
-            setOffset({ x: event.clientX - startPos.x, y: event.clientY - startPos.y });
+        if (state.matches('panning')) {
+            send({ type: 'MOUSE_MOVE', clientX: event.clientX, clientY: event.clientY });
         }
     };
 
     const handleMouseUp = () => {
-        setIsPanning(false);
+        send({ type: 'MOUSE_UP' });
+    };
+
+    const handleMouseLeave = () => {
+        send({ type: 'MOUSE_LEAVE' });
     };
 
     return (
@@ -57,8 +63,8 @@ const Whiteboard: React.FC = () => {
             onMouseDown={handleMouseDown}
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
-            onMouseLeave={handleMouseUp}
-            style={{ cursor: isPanning ? 'grabbing' : 'grab' }}
+            onMouseLeave={handleMouseLeave}
+            style={{ cursor: state.matches('panning') ? 'grabbing' : 'grab' }}
         />
     );
 };
