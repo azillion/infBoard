@@ -1,16 +1,24 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useMachine } from '@xstate/react';
 
 import appMachine from '../state/appMachine';
 import { useWebRTC } from '../context/WebRTCContext';
+import { MessageType, encode } from '../utils/encoder';
 
 const NicknameModal: React.FC = () => {
     const { sendMessage } = useWebRTC();
     const [state, send] = useMachine(appMachine);
 
+    useEffect(() => {
+        const nickname = localStorage.getItem('nickname');
+        if (nickname) {
+            sendMessage(encode(MessageType.NICKNAME, nickname));
+        }
+    }, [sendMessage]);
+
     const handleSubmit = () => {
         send({ type: 'SUBMIT_NICKNAME' });
-        sendMessage(`Nickname: ${state.context.nickname}`);
+        sendMessage(encode(MessageType.NICKNAME, state.context.nickname));
     };
 
     if (state.matches('nickname')) {
