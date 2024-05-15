@@ -71,4 +71,3 @@ const Whiteboard: React.FC = () => {
 };
 
 export default Whiteboard;
-

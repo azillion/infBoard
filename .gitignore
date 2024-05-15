@@ -22,3 +22,4 @@ go.work
 
 .DS_Store
 server/tmp/*
+client/node_modules/*
