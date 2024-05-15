@@ -1,12 +1,13 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useMachine } from '@xstate/react';
-
-import wbMachine from '../state/wbMachine';
+import whiteboardMachine from '../state/wbMachine';
+import { useWebRTC } from '../context/WebRTCContext';
 
 const Whiteboard: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [state, send] = useMachine(wbMachine);
+    const [state, send] = useMachine(whiteboardMachine);
     const { offset } = state.context;
+    const { sendMessage } = useWebRTC();
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -28,8 +29,6 @@ const Whiteboard: React.FC = () => {
         const drawScene = () => {
             gl.clearColor(1, 1, 1, 1);
             gl.clear(gl.COLOR_BUFFER_BIT);
-
-            // paint existing here
         };
 
         resizeCanvas();
@@ -47,6 +46,7 @@ const Whiteboard: React.FC = () => {
     const handleMouseMove = (event: React.MouseEvent) => {
         if (state.matches('panning')) {
             send({ type: 'MOUSE_MOVE', clientX: event.clientX, clientY: event.clientY });
+            sendMessage(`Mouse moved to (${event.clientX}, ${event.clientY})`);
         }
     };
 
@@ -71,3 +71,4 @@ const Whiteboard: React.FC = () => {
 };
 
 export default Whiteboard;
+
