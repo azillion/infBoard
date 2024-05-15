@@ -1,5 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 import { useMachine } from '@xstate/react';
+
 import wbMachine from '../state/wbMachine';
 
 const Whiteboard: React.FC = () => {
@@ -28,7 +29,7 @@ const Whiteboard: React.FC = () => {
             gl.clearColor(1, 1, 1, 1);
             gl.clear(gl.COLOR_BUFFER_BIT);
 
-            // Additional rendering code for whiteboard content can go here
+            // paint existing here
         };
 
         resizeCanvas();

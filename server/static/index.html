@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebRTC Pion Client</title>
+</head>
+<body>
+    <h1>WebRTC Pion Client</h1>
+    <pre id="localDescription"></pre>
+    <pre id="remoteDescription"></pre>
+    <script>
+        const pc = new RTCPeerConnection({
+            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        });
+
+        const ws = new WebSocket('ws://localhost:8080/websocket');
+
+        ws.onmessage = async (event) => {
+            const message = JSON.parse(event.data);
+            switch (message.event) {
+                case 'offer':
+                    await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(message.data)));
+                    const answer = await pc.createAnswer();
+                    await pc.setLocalDescription(answer);
+                    ws.send(JSON.stringify({ event: 'answer', data: JSON.stringify(answer) }));
+                    break;
+                case 'candidate':
+                    await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(message.data)));
+                    break;
+            }
+        };
+
+        pc.onicecandidate = event => {
+            if (event.candidate) {
+                ws.send(JSON.stringify({ event: 'candidate', data: JSON.stringify(event.candidate) }));
+            }
+        };
+
+        pc.ondatachannel = event => {
+            const channel = event.channel;
+            channel.onmessage = e => console.log('Received message:', e.data);
+            channel.onopen = () => {
+                console.log('Data channel opened!');
+                for (let i = 0; i < 5; i++) {
+                    channel.send('Message ' + i + ' from the browser');
+                }
+            };
+        };
+    </script>
+</body>
+</html>
+

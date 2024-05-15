@@ -1,5 +1,6 @@
 import { assign, createMachine } from 'xstate';
 
+
 interface WhiteboardContext {
     offset: { x: number, y: number };
     startPos: { x: number, y: number };
