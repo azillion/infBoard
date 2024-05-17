@@ -3,7 +3,8 @@ import { useMachine } from '@xstate/react';
 
 import appMachine from '../state/appMachine';
 import { useWebRTC } from '../context/WebRTCContext';
-import { MessageType, encode } from '../utils/encoder';
+import { encode } from '../utils/encoder';
+import { MessageType } from '../models/message';
 
 const NicknameModal: React.FC = () => {
     const { sendMessage } = useWebRTC();

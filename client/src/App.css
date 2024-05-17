@@ -1,0 +1,7 @@
+/* src/App.css */
+canvas {
+    display: block; /* Removes scrollbars */
+    width: 100vw;
+    height: 100vh;
+}
+

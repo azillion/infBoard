@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 
 interface WebRTCContextType {
     sendMessage: (message: string) => void;
+    onMessage: (callback: (message: string) => void) => void;
 }
 
 const WebRTCContext = createContext<WebRTCContextType | undefined>(undefined);
@@ -16,6 +17,7 @@ export const useWebRTC = () => {
 
 export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
+    const messageCallbackRef = useRef<(message: string) => void>(() => { });
 
     useEffect(() => {
         const pc = new RTCPeerConnection({
@@ -48,7 +50,12 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         pc.ondatachannel = event => {
             const channel = event.channel;
             setDataChannel(channel);
-            channel.onmessage = e => console.log('Received message:', e.data);
+            channel.onmessage = e => {
+                console.log('Received message:', e.data);
+                if (messageCallbackRef.current) {
+                    messageCallbackRef.current(e.data);
+                }
+            };
             channel.onopen = () => {
                 console.log('Data channel opened!');
                 for (let i = 0; i < 5; i++) {
@@ -71,10 +78,13 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     };
 
+    const onMessage = (callback: (message: string) => void) => {
+        messageCallbackRef.current = callback;
+    };
+
     return (
-        <WebRTCContext.Provider value={{ sendMessage }}>
+        <WebRTCContext.Provider value={{ sendMessage, onMessage }}>
             {children}
         </WebRTCContext.Provider>
     );
 };
-
