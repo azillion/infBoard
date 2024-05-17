@@ -2,12 +2,13 @@ import React, { useEffect, useRef } from 'react';
 import { useMachine } from '@xstate/react';
 import whiteboardMachine from '../state/wbMachine';
 import { useWebRTC } from '../context/WebRTCContext';
+import { MessageType, encode } from '../utils/encoder';
 
 const Whiteboard: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [state, send] = useMachine(whiteboardMachine);
     const { offset } = state.context;
-    const { sendMessage } = useWebRTC();
+    const { sendMessage, onMessage } = useWebRTC();
 
     useEffect(() => {
         const canvas = canvasRef.current;
@@ -39,15 +40,36 @@ const Whiteboard: React.FC = () => {
         };
     }, [offset]);
 
+    useEffect(() => {
+        onMessage((message: string) => {
+            // Handle the received message and update the canvas state accordingly
+            console.log('Received message to update canvas:', message);
+        });
+    }, [onMessage]);
+
     const handleMouseDown = (event: React.MouseEvent) => {
         send({ type: 'MOUSE_DOWN', clientX: event.clientX, clientY: event.clientY });
     };
 
     const handleMouseMove = (event: React.MouseEvent) => {
-        if (state.matches('panning')) {
+        if (state.matches('drawing')) {
+            const { clientX: x1, clientY: y1 } = event;
+
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const gl = canvas.getContext('webgl');
+            if (!gl) return;
+
+            // drawLine(gl, x0, y0, x1, y1);
+            send({ type: 'MOUSE_MOVE', clientX: x1, clientY: y1 });
+
+            // const message = encode(MessageType.DRAWING, `${x0},${y0},${x1},${y1}`);
+            // sendMessage(message);
+        } else if (state.matches('panning')) {
             send({ type: 'MOUSE_MOVE', clientX: event.clientX, clientY: event.clientY });
-            sendMessage(`Mouse moved to (${event.clientX}, ${event.clientY})`);
+            sendMessage(encode(MessageType.PANNING, `${event.clientX},${event.clientY}`));
         }
+        sendMessage(encode(MessageType.MOUSE_MOVE, `${event.clientX},${event.clientY}`));
     };
 
     const handleMouseUp = () => {

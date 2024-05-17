@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebGL Drawing</title>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #f0f0f0;
+        }
+
+        canvas {
+            border: 1px solid black;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="glcanvas" width="800" height="600"></canvas>
+    <script>
+        const canvas = document.getElementById('glcanvas');
+        const gl = canvas.getContext('webgl');
+
+        if (!gl) {
+            console.error('WebGL not supported, falling back on experimental-webgl');
+            gl = canvas.getContext('experimental-webgl');
+        }
+
+        if (!gl) {
+            alert('Your browser does not support WebGL');
+        }
+
+        // Initialize shaders
+        const vertexShaderSource = `
+    attribute vec4 aVertexPosition;
+    void main(void) {
+        gl_Position = aVertexPosition;
+        gl_PointSize = 5.0;
+    }
+`;
+
+        const fragmentShaderSource = `
+    void main(void) {
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+    }
+`;
+
+        function loadShader(gl, type, source) {
+            const shader = gl.createShader(type);
+            gl.shaderSource(shader, source);
+            gl.compileShader(shader);
+
+            if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+                console.error('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+                gl.deleteShader(shader);
+                return null;
+            }
+
+            return shader;
+        }
+
+        const vertexShader = loadShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
+        const fragmentShader = loadShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
+
+        const shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
+            console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
+        }
+
+        gl.useProgram(shaderProgram);
+
+        const vertexPosition = gl.getAttribLocation(shaderProgram, 'aVertexPosition');
+        gl.enableVertexAttribArray(vertexPosition);
+
+        const positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+
+        const positions = [];
+        let needsUpdate = false;
+        let lastMouseX = null;
+        let lastMouseY = null;
+
+        function addPoint(x, y) {
+            if (isNaN(x) || isNaN(y)) return;
+            console.log(x, y);
+            positions.push(x, y);
+            needsUpdate = true;
+        }
+
+        function interpolatePoints(x0, y0, x1, y1) {
+            const distance = Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
+            const steps = Math.ceil(distance / 0.01); // Adjust the step size as needed
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                const x = x0 + t * (x1 - x0);
+                const y = y0 + t * (y1 - y0);
+                addPoint(x, y);
+            }
+        }
+
+        canvas.addEventListener('mousemove', (event) => {
+            event.preventDefault();
+            if (event.buttons !== 1) return; // Only draw when the left mouse button is pressed
+
+            const rect = canvas.getBoundingClientRect();
+            const x = (event.clientX - rect.left) / rect.width * 2 - 1;
+            const y = (rect.bottom - event.clientY) / rect.height * 2 - 1;
+
+            if (lastMouseX !== null && lastMouseY !== null) {
+                interpolatePoints(lastMouseX, lastMouseY, x, y);
+            } else {
+                addPoint(x, y);
+            }
+
+            lastMouseX = x;
+            lastMouseY = y;
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            lastMouseX = null;
+            lastMouseY = null;
+        });
+
+        function drawScene() {
+            if (!needsUpdate) return;
+
+            gl.clear(gl.COLOR_BUFFER_BIT);
+
+            gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.DYNAMIC_DRAW);
+            gl.vertexAttribPointer(vertexPosition, 2, gl.FLOAT, false, 0, 0);
+
+            gl.drawArrays(gl.POINTS, 0, positions.length / 2);
+            needsUpdate = false;
+        }
+
+        function animate() {
+            drawScene();
+            requestAnimationFrame(animate);
+        }
+
+        gl.clearColor(1.0, 1.0, 1.0, 1.0);
+        gl.clear(gl.COLOR_BUFFER_BIT);
+
+        animate();
+    </script>
+</body>
+
+</html>

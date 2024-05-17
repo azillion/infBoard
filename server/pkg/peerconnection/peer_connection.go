@@ -2,7 +2,6 @@ package peerconnection
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"sync"
 
@@ -17,14 +16,8 @@ var (
 
 func RegisterDataChannelCallbacks(dataChannel *webrtc.DataChannel) {
 	dataChannel.OnOpen(func() {
-		log.Println("Data channel opened!")
-		for i := 0; i < 5; i++ {
-			message := "Message " + fmt.Sprint(i) + " from Pion"
-			if err := dataChannel.SendText(message); err != nil {
-				log.Print(err)
-				return
-			}
-		}
+		log.Println("DataChannel opened")
+		// send canvas and cursor data
 	})
 
 	dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {

@@ -21,4 +21,3 @@ func main() {
 
 	log.Fatal(http.ListenAndServe(*addr, nil))
 }
-
