@@ -2,9 +2,12 @@ import { useEffect, useRef, useCallback } from 'react';
 import { encode } from '../utils/encoder';
 import { useWebRTC } from '../context/WebRTCContext';
 import { MessageType } from '../models/message';
+import { useMachine } from '@xstate/react';
+import whiteboardMachine from '../state/wbMachine';
 
 export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     const { sendMessage, onMessage } = useWebRTC();
+    const [state, send] = useMachine(whiteboardMachine);
     const glRef = useRef<WebGLRenderingContext | null>(null);
     const programRef = useRef<WebGLProgram | null>(null);
     const vertexPositionRef = useRef<number | null>(null);
@@ -15,6 +18,7 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     const lastMouseYRef = useRef<number | null>(null);
     const panOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
     const startPanOffsetRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+    const panStartMouseRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
     const addPoint = useCallback((x: number, y: number) => {
         positionsRef.current.push(x, y);
@@ -183,13 +187,6 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
         return { x, y };
     };
 
-    const getCanvasCoordinates = (canvas: HTMLCanvasElement, x: number, y: number) => {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = ((x + 1) / 2) * rect.width + rect.left;
-        const clientY = rect.bottom - ((y + 1) / 2) * rect.height;
-        return { clientX, clientY };
-    };
-
     const adjustForPan = (x: number, y: number, panX: number, panY: number) => {
         return {
             x: x - panX,
@@ -197,87 +194,76 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
         };
     };
 
-    const handleKeyDown = useCallback((event: KeyboardEvent, state: any, send: any) => {
-        if (event.key === ' ' && state.matches('idle')) {
-            send({ type: 'KEY_DOWN', key: event.key });
-            startPanOffsetRef.current = { ...panOffsetRef.current };
-            event.preventDefault(); // Prevent the default action of the space bar
-        }
-    }, []);
-
-    const handleKeyUp = useCallback((event: KeyboardEvent, send: any) => {
-        send({ type: 'KEY_UP', key: event.key });
-        event.preventDefault();
-    }, []);
-
-    const handleMouseDown = (event: React.MouseEvent, send: any) => {
-        lastMouseXRef.current = event.clientX;
-        lastMouseYRef.current = event.clientY;
+    const handleMouseDown = (event: React.MouseEvent) => {
+        lastMouseXRef.current = null;
+        lastMouseYRef.current = null;
+        panStartMouseRef.current = { x: event.clientX, y: event.clientY };
+        startPanOffsetRef.current = { ...panOffsetRef.current };
         send({ type: 'MOUSE_DOWN', clientX: event.clientX, clientY: event.clientY });
     };
 
-    const handleMouseMove = (event: React.MouseEvent, state: any, send: any) => {
+    const handleMouseMove = (event: React.MouseEvent) => {
         const canvas = canvasRef.current!;
         const { x, y } = getWebGLCoordinates(canvas, event.clientX, event.clientY);
-        const panX = panOffsetRef.current.x;
-        const panY = panOffsetRef.current.y;
+        const adjustedX = x - panOffsetRef.current.x;
+        const adjustedY = y - panOffsetRef.current.y;
 
-        if (state.matches('drawing')) {
-            if (lastMouseXRef.current !== null && lastMouseYRef.current !== null) {
-                interpolatePoints(lastMouseXRef.current, lastMouseYRef.current, x, y);
-            } else {
-                addPoint(x, y);
-            }
+        if (event.buttons === 1) { // Left mouse button is pressed
+            if (state.matches('panning')) {
+                const deltaX = (event.clientX - panStartMouseRef.current.x) / canvas.width * 2;
+                const deltaY = -(event.clientY - panStartMouseRef.current.y) / canvas.height * 2;
 
-            const { clientX, clientY } = getCanvasCoordinates(canvas, x, y);
-            sendMessage(encode(MessageType.DRAWING, { x: clientX, y: clientY, panX, panY }));
-
-            lastMouseXRef.current = x;
-            lastMouseYRef.current = y;
-
-            send({ type: 'MOUSE_MOVE', clientX: event.clientX, clientY: event.clientY });
-        } else if (state.matches('panning')) {
-            if (lastMouseXRef.current !== null && lastMouseYRef.current !== null) {
-                const deltaX = (event.clientX - lastMouseXRef.current) / canvas.width * 2;
-                const deltaY = -(event.clientY - lastMouseYRef.current) / canvas.height * 2; // Adjust for WebGL's Y-axis
-
-                // Accumulate the deltas to the existing pan offsets
-                panOffsetRef.current.x += deltaX;
-                panOffsetRef.current.y += deltaY;
+                panOffsetRef.current = {
+                    x: startPanOffsetRef.current.x + deltaX,
+                    y: startPanOffsetRef.current.y + deltaY,
+                };
                 needsUpdateRef.current = true;
 
                 sendMessage(encode(MessageType.PANNING, { x: deltaX, y: deltaY }));
+            } else if (state.matches('drawing')) {
+                if (lastMouseXRef.current !== null && lastMouseYRef.current !== null) {
+                    interpolatePoints(lastMouseXRef.current, lastMouseYRef.current, adjustedX, adjustedY);
+                } else {
+                    addPoint(adjustedX, adjustedY);
+                }
+
+                const { clientX, clientY } = event;
+                sendMessage(encode(MessageType.DRAWING, { x: clientX, y: clientY, panX: panOffsetRef.current.x, panY: panOffsetRef.current.y }));
+
+                lastMouseXRef.current = adjustedX;
+                lastMouseYRef.current = adjustedY;
             }
 
-            lastMouseXRef.current = event.clientX;
-            lastMouseYRef.current = event.clientY;
-
-            console.log("Updated PanOffset:", panOffsetRef.current);
-        } else {
             send({ type: 'MOUSE_MOVE', clientX: event.clientX, clientY: event.clientY });
-            sendMessage(encode(MessageType.MOUSE_MOVE, { x: event.clientX, y: event.clientY }));
         }
     };
 
-    const handleMouseUp = (send: any) => {
+    const handleMouseUp = () => {
         lastMouseXRef.current = null;
         lastMouseYRef.current = null;
         send({ type: 'MOUSE_UP' });
     };
 
-    const handleMouseLeave = (send: any) => {
+    const handleMouseLeave = () => {
         lastMouseXRef.current = null;
         lastMouseYRef.current = null;
         send({ type: 'MOUSE_LEAVE' });
     };
+
+    useEffect(() => {
+        document.addEventListener('keydown', (event) => send({ type: 'KEY_DOWN', key: event.key }));
+        document.addEventListener('keyup', (event) => send({ type: 'KEY_UP', key: event.key }));
+
+        return () => {
+            document.removeEventListener('keydown', (event) => send({ type: 'KEY_DOWN', key: event.key }));
+            document.removeEventListener('keyup', (event) => send({ type: 'KEY_UP', key: event.key }));
+        };
+    }, [send]);
 
     return {
         handleMouseDown,
         handleMouseMove,
         handleMouseUp,
         handleMouseLeave,
-        handleKeyDown,
-        handleKeyUp
     };
 };
-
