@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { AppContext } from './AppContext';
 
 interface WebRTCContextType {
     sendMessage: (message: string) => void;
@@ -17,7 +18,13 @@ export const useWebRTC = () => {
 
 export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
-    const messageCallbackRef = useRef<(message: string) => void>(() => { });
+    const [messageCallback, setMessageCallback] = useState<(message: string) => void>(() => { });
+    const appContextRef = AppContext.useActorRef();
+    const state = AppContext.useSelector((state) => state)
+
+    useEffect(() => {
+        console.log('App state2:', state.value);
+    }, [state]);
 
     useEffect(() => {
         const pc = new RTCPeerConnection({
@@ -51,16 +58,13 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const channel = event.channel;
             setDataChannel(channel);
             channel.onmessage = e => {
-                console.log('Received message:', e.data);
-                if (messageCallbackRef.current) {
-                    messageCallbackRef.current(e.data);
+                if (messageCallback) {
+                    messageCallback(e.data);
                 }
             };
             channel.onopen = () => {
                 console.log('Data channel opened!');
-                for (let i = 0; i < 5; i++) {
-                    channel.send('Message ' + i + ' from the browser');
-                }
+                appContextRef.send({ type: 'CONNECTION_ESTABLISHED' });
             };
         };
 
@@ -68,18 +72,18 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             ws.close();
             pc.close();
         };
-    }, []);
+    }, [messageCallback, appContextRef.send]);
 
     const sendMessage = (message: string) => {
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(message);
         } else {
-            console.error('Data channel is not open');
+            console.error('Data channel is not open', message);
         }
     };
 
     const onMessage = (callback: (message: string) => void) => {
-        messageCallbackRef.current = callback;
+        setMessageCallback(() => callback);
     };
 
     return (
@@ -88,3 +92,4 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         </WebRTCContext.Provider>
     );
 };
+

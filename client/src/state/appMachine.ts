@@ -1,17 +1,17 @@
 import { assign, setup } from 'xstate';
 
-interface AppContext {
+export interface AppContext {
     nickname: string;
 }
 
-type AppEvent =
-    | { type: 'SET_NICKNAME'; nickname: string };
+export type AppEvent =
+    | { type: 'SET_NICKNAME'; nickname: string }
+    | { type: 'SUBMIT_NICKNAME' }
+    | { type: 'CONNECTION_ESTABLISHED' };
 
 const context: AppContext = {
-    nickname: localStorage.getItem('nickname') || ''
+    nickname: ''
 };
-
-const initial = context.nickname ? 'drawing' : 'nickname';
 
 const appMachine = setup({
     types: {} as {
@@ -35,13 +35,20 @@ const appMachine = setup({
 }).createMachine(
     {
         id: 'app',
-        initial,
+        initial: 'loading',
         context,
         types: {} as {
             context: AppContext;
             event: AppEvent;
         },
         states: {
+            loading: {
+                on: {
+                    CONNECTION_ESTABLISHED: {
+                        target: 'nickname'
+                    }
+                }
+            },
             nickname: {
                 on: {
                     SET_NICKNAME: {
@@ -56,10 +63,10 @@ const appMachine = setup({
                     }
                 }
             },
-            drawing: {
-            }
+            drawing: {}
         }
     },
 );
 
 export default appMachine;
+
