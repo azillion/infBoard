@@ -138,71 +138,31 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
 
         window.addEventListener('resize', resizeCanvas);
         animate();
-    }, [animate, canvasRef]);
-
-    useEffect(() => {
-        setupWebGL();
-    }, [setupWebGL]);
-
-    useEffect(() => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const handleResize = () => {
-            const gl = glRef.current;
-            if (!gl) return;
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-            gl.viewport(0, 0, canvas.width, canvas.height);
-            drawScene();
-        };
-
-        window.addEventListener('resize', handleResize);
 
         return () => {
-            window.removeEventListener('resize', handleResize);
+            window.removeEventListener('resize', resizeCanvas);
         };
+    }, [animate, canvasRef]);
+
+    const handleResize = useCallback(() => {
+        const canvas = canvasRef.current;
+        const gl = glRef.current;
+        if (!canvas || !gl) return;
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        drawScene();
     }, [drawScene]);
 
-    useEffect(() => {
-        onMessage((message: string) => {
-            const decodedMessage = JSON.parse(message);
-            if (decodedMessage.type === MessageType.DRAWING) {
-                const { x, y, panX, panY } = decodedMessage.data;
-                const { x: adjustedX, y: adjustedY } = adjustForPan(x, y, panX, panY);
-                addPoint(adjustedX, adjustedY);
-            } else if (decodedMessage.type === MessageType.PANNING) {
-                const { x, y } = decodedMessage.data;
-                panOffsetRef.current.x += x;
-                panOffsetRef.current.y += y;
-                needsUpdateRef.current = true;
-            }
-        });
-    }, [onMessage, addPoint]);
-
-    const getWebGLCoordinates = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
-        const rect = canvas.getBoundingClientRect();
-        const x = (clientX - rect.left) / rect.width * 2 - 1;
-        const y = -((clientY - rect.top) / rect.height * 2 - 1); // Flip Y-axis for WebGL coordinates
-        return { x, y };
-    };
-
-    const adjustForPan = (x: number, y: number, panX: number, panY: number) => {
-        return {
-            x: x - panX,
-            y: y - panY
-        };
-    };
-
-    const handleMouseDown = (event: React.MouseEvent) => {
+    const handleMouseDown = useCallback((event: React.MouseEvent) => {
         lastMouseXRef.current = null;
         lastMouseYRef.current = null;
         panStartMouseRef.current = { x: event.clientX, y: event.clientY };
         startPanOffsetRef.current = { ...panOffsetRef.current };
         send({ type: 'MOUSE_DOWN', clientX: event.clientX, clientY: event.clientY });
-    };
+    }, [send]);
 
-    const handleMouseMove = (event: React.MouseEvent) => {
+    const handleMouseMove = useCallback((event: React.MouseEvent) => {
         const canvas = canvasRef.current!;
         const { x, y } = getWebGLCoordinates(canvas, event.clientX, event.clientY);
         const adjustedX = x - panOffsetRef.current.x;
@@ -236,29 +196,65 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
 
             send({ type: 'MOUSE_MOVE', clientX: event.clientX, clientY: event.clientY });
         }
-    };
+    }, [state, send, sendMessage, interpolatePoints, addPoint]);
 
-    const handleMouseUp = () => {
+    const handleMouseUp = useCallback(() => {
         lastMouseXRef.current = null;
         lastMouseYRef.current = null;
         send({ type: 'MOUSE_UP' });
-    };
+    }, [send]);
 
-    const handleMouseLeave = () => {
+    const handleMouseLeave = useCallback(() => {
         lastMouseXRef.current = null;
         lastMouseYRef.current = null;
         send({ type: 'MOUSE_LEAVE' });
-    };
+    }, [send]);
+
+    const handleKeyDown = useCallback((event: KeyboardEvent) => {
+        send({ type: 'KEY_DOWN', key: event.key });
+    }, [send]);
+
+    const handleKeyUp = useCallback((event: KeyboardEvent) => {
+        send({ type: 'KEY_UP', key: event.key });
+    }, [send]);
 
     useEffect(() => {
-        document.addEventListener('keydown', (event) => send({ type: 'KEY_DOWN', key: event.key }));
-        document.addEventListener('keyup', (event) => send({ type: 'KEY_UP', key: event.key }));
+        setupWebGL();
+    }, [setupWebGL]);
+
+    useEffect(() => {
+        window.addEventListener('resize', handleResize);
 
         return () => {
-            document.removeEventListener('keydown', (event) => send({ type: 'KEY_DOWN', key: event.key }));
-            document.removeEventListener('keyup', (event) => send({ type: 'KEY_UP', key: event.key }));
+            window.removeEventListener('resize', handleResize);
         };
-    }, [send]);
+    }, [handleResize]);
+
+    useEffect(() => {
+        onMessage((message: string) => {
+            const decodedMessage = JSON.parse(message);
+            if (decodedMessage.type === MessageType.DRAWING) {
+                const { x, y, panX, panY } = decodedMessage.data;
+                const { x: adjustedX, y: adjustedY } = adjustForPan(x, y, panX, panY);
+                addPoint(adjustedX, adjustedY);
+            } else if (decodedMessage.type === MessageType.PANNING) {
+                const { x, y } = decodedMessage.data;
+                panOffsetRef.current.x += x;
+                panOffsetRef.current.y += y;
+                needsUpdateRef.current = true;
+            }
+        });
+    }, [onMessage, addPoint]);
+
+    useEffect(() => {
+        document.addEventListener('keydown', handleKeyDown);
+        document.addEventListener('keyup', handleKeyUp);
+
+        return () => {
+            document.removeEventListener('keydown', handleKeyDown);
+            document.removeEventListener('keyup', handleKeyUp);
+        };
+    }, [handleKeyDown, handleKeyUp]);
 
     return {
         handleMouseDown,
@@ -267,3 +263,18 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
         handleMouseLeave,
     };
 };
+
+const getWebGLCoordinates = (canvas: HTMLCanvasElement, clientX: number, clientY: number) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = (clientX - rect.left) / rect.width * 2 - 1;
+    const y = -((clientY - rect.top) / rect.height * 2 - 1); // Flip Y-axis for WebGL coordinates
+    return { x, y };
+};
+
+const adjustForPan = (x: number, y: number, panX: number, panY: number) => {
+    return {
+        x: x - panX,
+        y: y - panY
+    };
+};
+

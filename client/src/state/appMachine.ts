@@ -45,7 +45,7 @@ const appMachine = setup({
             loading: {
                 on: {
                     CONNECTION_ESTABLISHED: {
-                        target: 'nickname'
+                        target: 'drawing'
                     }
                 }
             },
