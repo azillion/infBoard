@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { AppContext } from './AppContext';
 
 interface WebRTCContextType {
@@ -18,73 +18,98 @@ export const useWebRTC = () => {
 
 export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
-    const [messageCallback, setMessageCallback] = useState<(message: string) => void>(() => { });
+    const messageCallbackRef = useRef<(message: string) => void>(() => { });
     const appContextRef = AppContext.useActorRef();
-    const state = AppContext.useSelector((state) => state)
+    const state = AppContext.useSelector((state) => state);
+    const pcRef = useRef<RTCPeerConnection | null>(null);
+    const wsRef = useRef<WebSocket | null>(null);
 
     useEffect(() => {
-        console.log('App state2:', state.value);
+        console.log('App state:', state.value);
     }, [state]);
 
     useEffect(() => {
-        const pc = new RTCPeerConnection({
-            iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-        });
+        if (!pcRef.current) {
+            console.log('Creating RTCPeerConnection');
+            const pc = new RTCPeerConnection({
+                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+            });
+            pcRef.current = pc;
 
-        const ws = new WebSocket('ws://localhost:8080/websocket');
+            if (!wsRef.current) {
+                console.log('Creating WebSocket connection');
+                const ws = new WebSocket('ws://localhost:8080/websocket');
+                wsRef.current = ws;
 
-        ws.onmessage = async (event) => {
-            const message = JSON.parse(event.data);
-            switch (message.event) {
-                case 'offer':
-                    await pc.setRemoteDescription(new RTCSessionDescription(JSON.parse(message.data)));
-                    const answer = await pc.createAnswer();
-                    await pc.setLocalDescription(answer);
-                    ws.send(JSON.stringify({ event: 'answer', data: JSON.stringify(answer) }));
-                    break;
-                case 'candidate':
-                    await pc.addIceCandidate(new RTCIceCandidate(JSON.parse(message.data)));
-                    break;
+                ws.onmessage = async (event) => {
+                    const message = JSON.parse(event.data);
+                    switch (message.event) {
+                        case 'offer':
+                            if (pcRef.current) {
+                                await pcRef.current.setRemoteDescription(new RTCSessionDescription(JSON.parse(message.data)));
+                                const answer = await pcRef.current.createAnswer();
+                                await pcRef.current.setLocalDescription(answer);
+                                ws.send(JSON.stringify({ event: 'answer', data: JSON.stringify(answer) }));
+                            }
+                            break;
+                        case 'candidate':
+                            if (pcRef.current) {
+                                await pcRef.current.addIceCandidate(new RTCIceCandidate(JSON.parse(message.data)));
+                            }
+                            break;
+                        default:
+                            console.error('Unknown message event:', message.event);
+                    }
+                };
+
+                ws.onclose = () => {
+                    wsRef.current = null;
+                };
             }
-        };
 
-        pc.onicecandidate = event => {
-            if (event.candidate) {
-                ws.send(JSON.stringify({ event: 'candidate', data: JSON.stringify(event.candidate) }));
-            }
-        };
-
-        pc.ondatachannel = event => {
-            const channel = event.channel;
-            setDataChannel(channel);
-            channel.onmessage = e => {
-                if (messageCallback) {
-                    messageCallback(e.data);
+            pc.onicecandidate = (event) => {
+                if (event.candidate && wsRef.current) {
+                    wsRef.current.send(JSON.stringify({ event: 'candidate', data: JSON.stringify(event.candidate) }));
                 }
             };
-            channel.onopen = () => {
-                console.log('Data channel opened!');
-                appContextRef.send({ type: 'CONNECTION_ESTABLISHED' });
+
+            pc.ondatachannel = (event) => {
+                const channel = event.channel;
+                setDataChannel(channel);
+                channel.onmessage = (e) => {
+                    if (messageCallbackRef.current) {
+                        messageCallbackRef.current(e.data);
+                    }
+                };
+                channel.onopen = () => {
+                    console.log('Data channel opened!');
+                    appContextRef.send({ type: 'CONNECTION_ESTABLISHED' });
+                };
             };
-        };
+        }
+    }, [appContextRef]);
 
-        return () => {
-            ws.close();
-            pc.close();
-        };
-    }, [messageCallback, appContextRef.send]);
+    useEffect(() => {
+        if (dataChannel) {
+            dataChannel.onmessage = (e) => {
+                if (messageCallbackRef.current) {
+                    messageCallbackRef.current(e.data);
+                }
+            };
+        }
+    }, [dataChannel]);
 
-    const sendMessage = (message: string) => {
+    const sendMessage = useCallback((message: string) => {
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(message);
         } else {
             console.error('Data channel is not open', message);
         }
-    };
+    }, [dataChannel]);
 
-    const onMessage = (callback: (message: string) => void) => {
-        setMessageCallback(() => callback);
-    };
+    const onMessage = useCallback((callback: (message: string) => void) => {
+        messageCallbackRef.current = callback;
+    }, []);
 
     return (
         <WebRTCContext.Provider value={{ sendMessage, onMessage }}>
@@ -92,4 +117,20 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         </WebRTCContext.Provider>
     );
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
