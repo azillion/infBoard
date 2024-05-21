@@ -1,9 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useMachine } from '@xstate/react';
-import { encode } from '../utils/encoder';
 import { useWebRTC } from '../context/WebRTCContext';
 import { MessageType } from '../models/message';
 import whiteboardMachine from '../state/wbMachine';
+import { EventType } from '../models/event';
 
 export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     const { sendMessage, onMessage } = useWebRTC();
@@ -22,6 +22,7 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
 
     const addPoint = useCallback((x: number, y: number) => {
         positionsRef.current.push(x, y);
+        sendMessage(EventType.DRAWING, JSON.stringify({ x, y, panX: panOffsetRef.current.x, panY: panOffsetRef.current.y }));
         needsUpdateRef.current = true;
     }, []);
 
@@ -179,16 +180,13 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
                 };
                 needsUpdateRef.current = true;
 
-                sendMessage(encode(MessageType.PANNING, { x: deltaX, y: deltaY }));
+                sendMessage(EventType.PANNING, JSON.stringify({ x: deltaX, y: deltaY }));
             } else if (state.matches('drawing')) {
                 if (lastMouseXRef.current !== null && lastMouseYRef.current !== null) {
                     interpolatePoints(lastMouseXRef.current, lastMouseYRef.current, adjustedX, adjustedY);
                 } else {
                     addPoint(adjustedX, adjustedY);
                 }
-
-                const { clientX, clientY } = event;
-                sendMessage(encode(MessageType.DRAWING, { x: clientX, y: clientY, panX: panOffsetRef.current.x, panY: panOffsetRef.current.y }));
 
                 lastMouseXRef.current = adjustedX;
                 lastMouseYRef.current = adjustedY;

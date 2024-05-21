@@ -112,6 +112,14 @@ func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 			log.Printf("Panning: %+v", panning)
 			session.Panning = panning
 			peerconnection.UpdateSession(userID, session)
+		case "drawing":
+			point := models.DrawingPoint{}
+			if err := json.Unmarshal([]byte(message.Data), &point); err != nil {
+				log.Println(err)
+				return
+			}
+			log.Printf("Drawing: %+v", point)
+			session.Drawings = append(session.Drawings, point)
 		}
 	}
 }

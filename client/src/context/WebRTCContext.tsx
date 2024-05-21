@@ -1,8 +1,9 @@
 import React, { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
 import { AppContext } from './AppContext';
+import { EventType } from '../models/event';
 
 interface WebRTCContextType {
-    sendMessage: (message: string) => void;
+    sendMessage: (event: EventType, message: string) => void;
     onMessage: (callback: (message: string) => void) => void;
 }
 
@@ -39,7 +40,7 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 ws.onmessage = async (event) => {
                     const message = JSON.parse(event.data);
                     switch (message.event) {
-                        case 'offer':
+                        case EventType.OFFER:
                             if (pcRef.current) {
                                 await pcRef.current.setRemoteDescription(new RTCSessionDescription(JSON.parse(message.data)));
                                 const answer = await pcRef.current.createAnswer();
@@ -47,7 +48,7 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                                 ws.send(JSON.stringify({ event: 'answer', data: JSON.stringify(answer) }));
                             }
                             break;
-                        case 'candidate':
+                        case EventType.CANDIDATE:
                             if (pcRef.current) {
                                 await pcRef.current.addIceCandidate(new RTCIceCandidate(JSON.parse(message.data)));
                             }
@@ -94,13 +95,20 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         }
     }, [dataChannel]);
 
-    const sendMessage = useCallback((message: string) => {
-        if (dataChannel && dataChannel.readyState === 'open') {
-            dataChannel.send(message);
-        } else {
-            console.error('Data channel is not open', dataChannel?.readyState);
+    // const sendMessage = useCallback((message: string) => {
+    //     if (dataChannel && dataChannel.readyState === 'open') {
+    //         dataChannel.send(message);
+    //     } else {
+    //         console.error('Data channel is not open', dataChannel?.readyState);
+    //     }
+    // }, [dataChannel]);
+
+    const sendMessage = useCallback((event: EventType, message: string) => {
+        if (wsRef.current) {
+            wsRef.current.send(JSON.stringify({ event, data: message }));
         }
-    }, [dataChannel]);
+    }, []);
+
 
     const onMessage = useCallback((callback: (message: string) => void) => {
         messageCallbackRef.current = callback;
