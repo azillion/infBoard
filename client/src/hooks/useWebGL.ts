@@ -156,24 +156,35 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
         drawScene();
     }, [drawScene]);
 
-    const handleMouseDown = useCallback((event: React.MouseEvent) => {
+    const handleMouseDown = useCallback((event: React.MouseEvent | React.TouchEvent) => {
         lastMouseXRef.current = null;
         lastMouseYRef.current = null;
-        panStartMouseRef.current = { x: event.clientX, y: event.clientY };
+        const clientX = 'clientX' in event ? event.clientX : event.touches[0].clientX;
+        const clientY = 'clientY' in event ? event.clientY : event.touches[0].clientY;
+        panStartMouseRef.current = { x: clientX, y: clientY };
         startPanOffsetRef.current = { ...panOffsetRef.current };
-        send({ type: 'MOUSE_DOWN', clientX: event.clientX, clientY: event.clientY });
+        send({ type: 'MOUSE_DOWN', clientX, clientY });
     }, [send]);
 
-    const handleMouseMove = useCallback((event: React.MouseEvent) => {
+    const handleMouseMove = useCallback((event: React.MouseEvent | React.TouchEvent) => {
+        const clientX = 'clientX' in event ? event.clientX : event.touches[0].clientX;
+        const clientY = 'clientY' in event ? event.clientY : event.touches[0].clientY;
         const canvas = canvasRef.current!;
-        const { x, y } = getWebGLCoordinates(canvas, event.clientX, event.clientY);
+        const { x, y } = getWebGLCoordinates(canvas, clientX, clientY);
         const adjustedX = x - panOffsetRef.current.x;
         const adjustedY = y - panOffsetRef.current.y;
 
-        if (event.buttons === 1) { // Left mouse button is pressed
+        let isLeftButton = true;
+        if ('button' in event) {
+            isLeftButton = event.button === 0;
+        } else if ('buttons' in event) {
+            isLeftButton = event.buttons === 1;
+        }
+
+        if (isLeftButton) {
             if (state.matches('panning')) {
-                const deltaX = (event.clientX - panStartMouseRef.current.x) / canvas.width * 2;
-                const deltaY = -(event.clientY - panStartMouseRef.current.y) / canvas.height * 2;
+                const deltaX = (clientX - panStartMouseRef.current.x) / canvas.width * 2;
+                const deltaY = -(clientY - panStartMouseRef.current.y) / canvas.height * 2;
 
                 panOffsetRef.current = {
                     x: startPanOffsetRef.current.x + deltaX,
@@ -195,7 +206,7 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
             }
 
             // TODO: send mouse location to other clients
-            send({ type: 'MOUSE_MOVE', clientX: event.clientX, clientY: event.clientY });
+            send({ type: 'MOUSE_MOVE', clientX, clientY });
         }
     }, [state, send, sendMessage, interpolatePoints, addPoint]);
 
