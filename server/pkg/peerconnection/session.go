@@ -1,6 +1,7 @@
 package peerconnection
 
 import (
+	"log"
 	"sync"
 
 	"github.com/pion/webrtc/v3"
@@ -42,6 +43,7 @@ func UpdateSession(userID string, session *models.Session) {
 }
 
 func DeleteSession(userID string) {
+	log.Printf("Deleting session for user %s", userID)
 	sessions.Delete(userID)
 }
 

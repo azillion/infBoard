@@ -7,20 +7,13 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/pion/webrtc/v3"
+	"infboard/pkg/models"
 	"infboard/pkg/peerconnection"
 	"infboard/pkg/utils"
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		// Check if the origin is in the list of allowed origins
-		allowedOrigins := map[string]bool{
-			"http://localhost:5173": true,
-			"https://infboard.com":  true,
-		}
-		return allowedOrigins[origin]
-	},
+	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
 func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
@@ -48,6 +41,9 @@ func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
+
+	session := peerconnection.CreateSession(userID, peerConnection, dataChannel, c)
+	defer peerconnection.DeleteSession(userID)
 
 	peerconnection.RegisterDataChannelCallbacks(dataChannel)
 	peerconnection.AddPeerConnection(peerConnection, c)
@@ -107,6 +103,15 @@ func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 				log.Println(err)
 				return
 			}
+		case "panning":
+			panning := models.PanningOffset{}
+			if err := json.Unmarshal([]byte(message.Data), &panning); err != nil {
+				log.Println(err)
+				return
+			}
+			log.Printf("Panning: %+v", panning)
+			session.Panning = panning
+			peerconnection.UpdateSession(userID, session)
 		}
 	}
 }
