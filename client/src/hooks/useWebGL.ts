@@ -4,6 +4,8 @@ import { useWebRTC } from '../context/WebRTCContext';
 import whiteboardMachine from '../state/wbMachine';
 import { EventType } from '../models/event';
 
+const STEP = 0.005;
+
 export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     const { sendMessage, onMessage } = useWebRTC();
     const [state, send] = useMachine(whiteboardMachine);
@@ -26,7 +28,7 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
 
     const interpolatePoints = useCallback((x0: number, y0: number, x1: number, y1: number) => {
         const distance = Math.sqrt((x1 - x0) * (x1 - x0) + (y1 - y0) * (y1 - y0));
-        const steps = Math.ceil(distance / 0.005); // Adjust the step size as needed
+        const steps = Math.ceil(distance / STEP);
         for (let i = 0; i <= steps; i++) {
             const t = i / steps;
             const x = x0 + t * (x1 - x0);

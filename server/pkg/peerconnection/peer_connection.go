@@ -36,7 +36,6 @@ func RegisterDataChannelCallbacks(dataChannel *webrtc.DataChannel) {
 				return
 			}
 		}
-		// send canvas and cursor data
 	})
 
 	dataChannel.OnMessage(func(msg webrtc.DataChannelMessage) {
