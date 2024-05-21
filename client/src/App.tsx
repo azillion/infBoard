@@ -1,5 +1,5 @@
 import './App.css';
-import Whiteboard from './components/Whiteboard';
+import Whiteboard from './components/whiteboard';
 import { AppContext } from './context/AppContext';
 
 function App() {
