@@ -12,6 +12,10 @@ const Whiteboard: React.FC = () => {
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseLeave}
+            onTouchStart={handleMouseDown}
+            onTouchMove={handleMouseMove}
+            onTouchEnd={handleMouseUp}
+            onTouchCancel={handleMouseLeave}
             style={{ cursor: 'crosshair' }}
         />
     );
