@@ -3,7 +3,7 @@ import { AppContext } from './AppContext';
 import { EventType } from '../models/event';
 
 const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
-const WS_URL = 'ws://infboard.com/api/websocket';
+const WS_URL = 'wss://infboard.com/api/websocket';
 
 interface WebRTCContextType {
     sendMessage: (event: EventType, message: string) => void;
