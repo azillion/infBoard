@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"infboard/pkg/signaling"
+	"infboard/pkg/websocket"
 )
 
 var (
@@ -16,7 +16,7 @@ func main() {
 	flag.Parse()
 	log.SetFlags(0)
 
-	http.HandleFunc("/websocket", signaling.WebsocketHandler)
+	http.HandleFunc("/websocket", websocket.WebsocketHandler)
 	http.Handle("/", http.FileServer(http.Dir("./static")))
 
 	log.Fatal(http.ListenAndServe(*addr, nil))

@@ -11,8 +11,7 @@ import (
 )
 
 type UserSession struct {
-	Drawings []models.DrawingPoint `json:"drawings"`
-	Panning  models.PanningOffset  `json:"panning"`
+	Panning models.PanningOffset `json:"panning"`
 }
 
 var sessions sync.Map
@@ -23,8 +22,6 @@ func CreateSession(userID string, pc *webrtc.PeerConnection, dc *webrtc.DataChan
 		PeerConnection:   pc,
 		DataChannel:      dc,
 		ThreadSafeWriter: writer,
-		Drawings:         []models.DrawingPoint{},
-		Panning:          models.PanningOffset{},
 	}
 	sessions.Store(userID, session)
 	return session
@@ -45,13 +42,6 @@ func UpdateSession(userID string, session *models.Session) {
 func DeleteSession(userID string) {
 	log.Printf("Deleting session for user %s", userID)
 	sessions.Delete(userID)
-}
-
-func UpdateDrawing(userID string, point models.DrawingPoint) {
-	session, _ := sessions.LoadOrStore(userID, &UserSession{})
-	userSession := session.(*UserSession)
-	userSession.Drawings = append(userSession.Drawings, point)
-	sessions.Store(userID, userSession)
 }
 
 func UpdatePanning(userID string, offset models.PanningOffset) {

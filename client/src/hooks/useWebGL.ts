@@ -1,7 +1,6 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useMachine } from '@xstate/react';
 import { useWebRTC } from '../context/WebRTCContext';
-import { MessageType } from '../models/message';
 import whiteboardMachine from '../state/wbMachine';
 import { EventType } from '../models/event';
 
@@ -22,7 +21,6 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
 
     const addPoint = useCallback((x: number, y: number) => {
         positionsRef.current.push(x, y);
-        sendMessage(EventType.DRAWING, JSON.stringify({ x, y, panX: panOffsetRef.current.x, panY: panOffsetRef.current.y }));
         needsUpdateRef.current = true;
     }, []);
 
@@ -34,6 +32,7 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
             const x = x0 + t * (x1 - x0);
             const y = y0 + t * (y1 - y0);
             addPoint(x, y);
+            sendMessage(EventType.DRAWING, JSON.stringify({ x, y, offsetX: panOffsetRef.current.x, offsetY: panOffsetRef.current.y }));
         }
     }, [addPoint]);
 
@@ -186,12 +185,14 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
                     interpolatePoints(lastMouseXRef.current, lastMouseYRef.current, adjustedX, adjustedY);
                 } else {
                     addPoint(adjustedX, adjustedY);
+                    sendMessage(EventType.DRAWING, JSON.stringify({ x, y, offsetX: panOffsetRef.current.x, offsetY: panOffsetRef.current.y }));
                 }
 
                 lastMouseXRef.current = adjustedX;
                 lastMouseYRef.current = adjustedY;
             }
 
+            // TODO: send mouse location to other clients
             send({ type: 'MOUSE_MOVE', clientX: event.clientX, clientY: event.clientY });
         }
     }, [state, send, sendMessage, interpolatePoints, addPoint]);
@@ -217,7 +218,10 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     }, [send]);
 
     useEffect(() => {
-        setupWebGL();
+        const cleanup = setupWebGL();
+        return () => {
+            if (cleanup) cleanup();
+        }
     }, [setupWebGL]);
 
     useEffect(() => {
@@ -229,17 +233,10 @@ export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     }, [handleResize]);
 
     useEffect(() => {
-        onMessage((message: string) => {
-            const decodedMessage = JSON.parse(message);
-            if (decodedMessage.type === MessageType.DRAWING) {
-                const { x, y, panX, panY } = decodedMessage.data;
-                const { x: adjustedX, y: adjustedY } = adjustForPan(x, y, panX, panY);
+        onMessage((type, data) => {
+            if (type === "drawing") {
+                const { x: adjustedX, y: adjustedY } = adjustForPan(data.x, data.y, data.offsetX, data.offsetY);
                 addPoint(adjustedX, adjustedY);
-            } else if (decodedMessage.type === MessageType.PANNING) {
-                const { x, y } = decodedMessage.data;
-                panOffsetRef.current.x += x;
-                panOffsetRef.current.y += y;
-                needsUpdateRef.current = true;
             }
         });
     }, [onMessage, addPoint]);

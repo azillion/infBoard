@@ -4,7 +4,7 @@ import { EventType } from '../models/event';
 
 interface WebRTCContextType {
     sendMessage: (event: EventType, message: string) => void;
-    onMessage: (callback: (message: string) => void) => void;
+    onMessage: (callback: (event: EventType, message: any) => void) => void;
 }
 
 const WebRTCContext = createContext<WebRTCContextType | undefined>(undefined);
@@ -19,7 +19,7 @@ export const useWebRTC = () => {
 
 export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
-    const messageCallbackRef = useRef<(message: string) => void>(() => { });
+    const messageCallbackRef = useRef<(event: EventType, message: any) => void>();
     const appContextRef = AppContext.useActorRef();
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
@@ -72,11 +72,6 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             pc.ondatachannel = (event) => {
                 const channel = event.channel;
                 setDataChannel(channel);
-                channel.onmessage = (e) => {
-                    if (messageCallbackRef.current) {
-                        messageCallbackRef.current(e.data);
-                    }
-                };
                 channel.onopen = () => {
                     console.log('Data channel opened!');
                     appContextRef.send({ type: 'CONNECTION_ESTABLISHED' });
@@ -89,19 +84,12 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (dataChannel) {
             dataChannel.onmessage = (e) => {
                 if (messageCallbackRef.current) {
-                    messageCallbackRef.current(e.data);
+                    const event = JSON.parse(toStr(new Uint8Array(e.data)));
+                    messageCallbackRef.current(event.type, event.data);
                 }
             };
         }
     }, [dataChannel]);
-
-    // const sendMessage = useCallback((message: string) => {
-    //     if (dataChannel && dataChannel.readyState === 'open') {
-    //         dataChannel.send(message);
-    //     } else {
-    //         console.error('Data channel is not open', dataChannel?.readyState);
-    //     }
-    // }, [dataChannel]);
 
     const sendMessage = useCallback((event: EventType, message: string) => {
         if (wsRef.current) {
@@ -110,7 +98,7 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }, []);
 
 
-    const onMessage = useCallback((callback: (message: string) => void) => {
+    const onMessage = useCallback((callback: (event: EventType, message: any) => void) => {
         messageCallbackRef.current = callback;
     }, []);
 
@@ -121,6 +109,9 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     );
 };
 
+function toStr(bytes: Uint8Array): string {
+    return String.fromCharCode(...bytes);
+}
 
 
 

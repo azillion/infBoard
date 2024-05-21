@@ -5,9 +5,11 @@ import (
 	"log"
 	"sync"
 
-	"github.com/pion/webrtc/v3"
 	"infboard/pkg/models"
+	"infboard/pkg/storage"
 	"infboard/pkg/utils"
+
+	"github.com/pion/webrtc/v3"
 )
 
 var (
@@ -18,6 +20,22 @@ var (
 func RegisterDataChannelCallbacks(dataChannel *webrtc.DataChannel) {
 	dataChannel.OnOpen(func() {
 		log.Println("DataChannel opened")
+		points := storage.GetDrawingPoints()
+		for _, point := range points {
+			message := models.DataChannelMessage{
+				Type: "drawing",
+				Data: point,
+			}
+			messageBytes, err := json.Marshal(message)
+			if err != nil {
+				log.Println(err)
+				return
+			}
+			if err := dataChannel.Send(messageBytes); err != nil {
+				log.Println(err)
+				return
+			}
+		}
 		// send canvas and cursor data
 	})
 
@@ -67,4 +85,31 @@ func AddPeerConnection(pc *webrtc.PeerConnection, ws *utils.ThreadSafeWriter) {
 	listLock.Lock()
 	defer listLock.Unlock()
 	peerConnections = append(peerConnections, models.PeerConnectionState{PeerConnection: pc, Websocket: ws})
+}
+
+func BroadcastDrawingPoint(senderID string, point models.DrawingPointWithOffset) {
+	listLock.RLock()
+	defer listLock.RUnlock()
+
+	message := models.DataChannelMessage{
+		Type: "drawing",
+		Data: point,
+	}
+	messageBytes, err := json.Marshal(message)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	sessions.Range(func(key, value interface{}) bool {
+		session := value.(*models.Session)
+		if session.UserID != senderID {
+			if session.DataChannel.ReadyState() == webrtc.DataChannelStateOpen {
+				if err := session.DataChannel.Send(messageBytes); err != nil {
+					log.Println(err)
+				}
+			}
+		}
+		return true
+	})
 }

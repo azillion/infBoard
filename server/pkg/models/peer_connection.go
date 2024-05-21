@@ -10,6 +10,11 @@ type WebsocketMessage struct {
 	Data  string `json:"data"`
 }
 
+type DataChannelMessage struct {
+	Type string      `json:"type"`
+	Data interface{} `json:"data"`
+}
+
 type PeerConnectionState struct {
 	PeerConnection *webrtc.PeerConnection
 	Websocket      *utils.ThreadSafeWriter
