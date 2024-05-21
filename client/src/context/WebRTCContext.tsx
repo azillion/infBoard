@@ -20,13 +20,8 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
     const messageCallbackRef = useRef<(message: string) => void>(() => { });
     const appContextRef = AppContext.useActorRef();
-    const state = AppContext.useSelector((state) => state);
     const pcRef = useRef<RTCPeerConnection | null>(null);
     const wsRef = useRef<WebSocket | null>(null);
-
-    useEffect(() => {
-        console.log('App state:', state.value);
-    }, [state]);
 
     useEffect(() => {
         if (!pcRef.current) {
@@ -103,7 +98,7 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (dataChannel && dataChannel.readyState === 'open') {
             dataChannel.send(message);
         } else {
-            console.error('Data channel is not open', message);
+            console.error('Data channel is not open', dataChannel?.readyState);
         }
     }, [dataChannel]);
 

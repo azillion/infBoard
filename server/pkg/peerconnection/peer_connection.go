@@ -6,12 +6,13 @@ import (
 	"sync"
 
 	"github.com/pion/webrtc/v3"
+	"infboard/pkg/models"
 	"infboard/pkg/utils"
 )
 
 var (
 	listLock        sync.RWMutex
-	peerConnections []PeerConnectionState
+	peerConnections []models.PeerConnectionState
 )
 
 func RegisterDataChannelCallbacks(dataChannel *webrtc.DataChannel) {
@@ -65,5 +66,5 @@ func SignalPeerConnections() {
 func AddPeerConnection(pc *webrtc.PeerConnection, ws *utils.ThreadSafeWriter) {
 	listLock.Lock()
 	defer listLock.Unlock()
-	peerConnections = append(peerConnections, PeerConnectionState{PeerConnection: pc, Websocket: ws})
+	peerConnections = append(peerConnections, models.PeerConnectionState{PeerConnection: pc, Websocket: ws})
 }

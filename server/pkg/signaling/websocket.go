@@ -12,7 +12,15 @@ import (
 )
 
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		origin := r.Header.Get("Origin")
+		// Check if the origin is in the list of allowed origins
+		allowedOrigins := map[string]bool{
+			"http://localhost:5173": true,
+			"https://infboard.com":  true,
+		}
+		return allowedOrigins[origin]
+	},
 }
 
 func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
@@ -24,6 +32,9 @@ func WebsocketHandler(w http.ResponseWriter, r *http.Request) {
 
 	c := &utils.ThreadSafeWriter{Conn: unsafeConn}
 	defer c.Close()
+
+	userID := utils.GenerateUniqueID()
+	log.Printf("New user connected: %s", userID)
 
 	peerConnection, err := webrtc.NewPeerConnection(webrtc.Configuration{})
 	if err != nil {
