@@ -2,6 +2,9 @@ import React, { createContext, useContext, useEffect, useState, useRef, useCallb
 import { AppContext } from './AppContext';
 import { EventType } from '../models/event';
 
+const ICE_SERVERS = [{ urls: 'stun:stun.l.google.com:19302' }];
+const WS_URL = 'ws://infboard.com/api/websocket';
+
 interface WebRTCContextType {
     sendMessage: (event: EventType, message: string) => void;
     onMessage: (callback: (event: EventType, message: any) => void) => void;
@@ -28,13 +31,13 @@ export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!pcRef.current) {
             console.log('Creating RTCPeerConnection');
             const pc = new RTCPeerConnection({
-                iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+                iceServers: ICE_SERVERS,
             });
             pcRef.current = pc;
 
             if (!wsRef.current) {
                 console.log('Creating WebSocket connection');
-                const ws = new WebSocket('ws://localhost:8080/websocket');
+                const ws = new WebSocket(WS_URL);
                 wsRef.current = ws;
 
                 ws.onmessage = async (event) => {
