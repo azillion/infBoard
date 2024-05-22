@@ -20,6 +20,25 @@ export const useWebRTC = () => {
     return context;
 };
 
+
+/**
+ * WebRTCProvider Component
+ * 
+ * This component sets up a WebRTC connection and provides a context for sending and receiving messages
+ * through a WebRTC data channel. It uses React's Context API to provide the WebRTC functionality 
+ * to any component that needs it within the application.
+ *
+ * The WebRTC connection is initialized with STUN servers to handle NAT traversal and a WebSocket
+ * connection to a signaling server for exchanging WebRTC offer/answer and ICE candidate messages.
+ * 
+ * The component provides two main functions:
+ * - sendMessage: Sends a message to the WebSocket  server
+ * - onMessage: Registers a callback to handle incoming messages on the data channel.
+ *
+ * Dependencies:
+ * - AppContext: Used to interact with the application's state machine.
+ * - EventType: Enum representing different types of events/messages
+ */
 export const WebRTCProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [dataChannel, setDataChannel] = useState<RTCDataChannel | null>(null);
     const messageCallbackRef = useRef<(event: EventType, message: any) => void>();

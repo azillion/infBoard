@@ -6,6 +6,25 @@ import { EventType } from '../models/event';
 
 const STEP = 0.005;
 
+/**
+ * useWebGL Custom Hook
+ * 
+ * This hook sets up and manages a WebGL context for drawing on a canvas. It integrates with a WebRTC
+ * data channel to synchronize drawing and panning actions across multiple clients. The hook also interacts 
+ * with a state machine (whiteboardMachine) to manage different states like drawing and panning.
+ * 
+ * Key functionalities:
+ * - Initialize WebGL context and shaders.
+ * - Handle window resize events to adjust the canvas size and viewport.
+ * - Capture mouse events for drawing and panning.
+ * - Send drawing and panning data to other clients via WebRTC data channel.
+ * - Receive and process drawing and panning data from other clients.
+ * 
+ * Dependencies:
+ * - useWebRTC: Custom hook for WebRTC data channel communication.
+ * - whiteboardMachine: XState state machine managing drawing and panning states.
+ * - EventType: Enum representing different types of events/messages.
+ */
 export const useWebGL = (canvasRef: React.RefObject<HTMLCanvasElement>) => {
     const { sendMessage, onMessage } = useWebRTC();
     const [state, send] = useMachine(whiteboardMachine);
